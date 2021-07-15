@@ -1,137 +1,59 @@
 from __future__ import division
 
-from ctypes import *
-from contextlib import contextmanager
+import sys
+from enum import Enum
+import time
 import itertools
+from textwrap import TextWrapper
 
 from google.cloud import mediatranslation as media
-import pyaudio
-from six.moves import queue
+import typer
+
+from live_translation.microphone import MicrophoneStream
 
 # Audio recording parameters
 RATE = 16000
 CHUNK = int(RATE / 10)  # 100ms
 SpeechEventType = media.StreamingTranslateSpeechResponse.SpeechEventType
 
-# To suppress pyaudio warnings
-# See: https://stackoverflow.com/a/17673011
-ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int, c_char_p)
+app = typer.Typer()
 
 
-def py_error_handler(filename, line, function, err, fmt):
-    pass
-
-
-c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
-
-
-@contextmanager
-def noalsaerr():
-    asound = cdll.LoadLibrary("libasound.so")
-    asound.snd_lib_error_set_handler(c_error_handler)
-    yield
-    asound.snd_lib_error_set_handler(None)
-
-
-class MicrophoneStream:
-    """Opens a recording stream as a generator yielding the audio chunks."""
-
-    def __init__(self, rate, chunk):
-        self._rate = rate
-        self._chunk = chunk
-
-        # Create a thread-safe buffer of audio data
-        self._buff = queue.Queue()
-        self.closed = True
-
-    def __enter__(self):
-        with noalsaerr():
-            self._audio_interface = pyaudio.PyAudio()
-        self._audio_stream = self._audio_interface.open(
-            format=pyaudio.paInt16,
-            channels=1,
-            rate=self._rate,
-            input=True,
-            frames_per_buffer=self._chunk,
-            # Run the audio stream asynchronously to fill the buffer object.
-            # This is necessary so that the input device's buffer doesn't
-            # overflow while the calling thread makes network requests, etc.
-            stream_callback=self._fill_buffer,
-        )
-
-        self.closed = False
-
-        return self
-
-    def __exit__(self, type=None, value=None, traceback=None):
-        self._audio_stream.stop_stream()
-        self._audio_stream.close()
-        self.closed = True
-        # Signal the generator to terminate so that the client's
-        # streaming_recognize method will not block the process termination.
-        self._buff.put(None)
-        self._audio_interface.terminate()
-
-    def _fill_buffer(self, in_data, frame_count, time_info, status_flags):
-        """Continuously collect data from the audio stream, into the buffer."""
-        self._buff.put(in_data)
-        return None, pyaudio.paContinue
-
-    def exit(self):
-        self.__exit__()
-
-    def generator(self):
-        while not self.closed:
-            # Use a blocking get() to ensure there's at least one chunk of
-            # data, and stop iteration if the chunk is None, indicating the
-            # end of the audio stream.
-            chunk = self._buff.get()
-            if chunk is None:
-                return
-            data = [chunk]
-
-            # Now consume whatever other data's still buffered.
-            while True:
-                try:
-                    chunk = self._buff.get(block=False)
-                    if chunk is None:
-                        return
-                    data.append(chunk)
-                except queue.Empty:
-                    break
-
-            yield b"".join(data)
-
-
-def listen_print_loop(responses):
+def _listen_print_loop(tw, output, responses):
     """Iterates through server responses and prints them.
 
     The responses passed is a generator that will block until a response
     is provided by the server.
     """
     translation = ""
+    is_final = False
     for response in responses:
         # Once the transcription settles, the response contains the
         # END_OF_SINGLE_UTTERANCE event.
-        if response.speech_event_type == SpeechEventType.END_OF_SINGLE_UTTERANCE:
+        if (
+            is_final
+            or response.speech_event_type == SpeechEventType.END_OF_SINGLE_UTTERANCE
+        ):
 
-            print(u"\nFinal translation: {0}".format(translation))
+            for line in tw.wrap(f"{translation}"):
+                output.write(f"{line}\n")
+                time.sleep(1)
             return 0
 
         result = response.result
         translation = result.text_translation_result.translation
+        is_final = result.text_translation_result.is_final
 
-        #  print(u'\nPartial translation: {0}'.format(translation))
+        #  print(u"{0}".format(translation), end='\r')
 
 
-def do_translation_loop():
-
+def _do_translation_loop(tw: TextWrapper, source: str, target: str, outfile):
     client = media.SpeechTranslationServiceClient()
 
     speech_config = media.TranslateSpeechConfig(
         audio_encoding="linear16",
-        source_language_code="en-US",
-        target_language_code="es-MX",
+        source_language_code=source,
+        target_language_code=target,
     )
 
     config = media.StreamingTranslateSpeechConfig(
@@ -140,16 +62,12 @@ def do_translation_loop():
 
     # The first request contains the configuration.
     # Note that audio_content is explicitly set to None.
-    first_request = media.StreamingTranslateSpeechRequest(
-        streaming_config=config, audio_content=None
-    )
+    first_request = media.StreamingTranslateSpeechRequest(streaming_config=config)
 
     with MicrophoneStream(RATE, CHUNK) as stream:
         audio_generator = stream.generator()
         mic_requests = (
-            media.StreamingTranslateSpeechRequest(
-                audio_content=content, streaming_config=config
-            )
+            media.StreamingTranslateSpeechRequest(audio_content=content)
             for content in audio_generator
         )
 
@@ -158,23 +76,61 @@ def do_translation_loop():
         responses = client.streaming_translate_speech(requests)
 
         # Print the translation responses as they arrive
-        result = listen_print_loop(responses)
+        result = _listen_print_loop(tw, outfile, responses)
         if result == 0:
             stream.exit()
 
 
-def main():
+@app.command()
+def main(
+    source_lang: str = typer.Option(
+        "en-US", "-f", "--source-lang", help="The speaker's language", show_default=True
+    ),
+    target_lang: str = typer.Option(
+        "es-MX",
+        "-t",
+        "--target-lang",
+        help="The language to translate captions to",
+        show_default=True,
+    ),
+    outfile: str = typer.Option(
+        "captions.txt",
+        "-o",
+        "--outfile",
+        help="What to name the caption file.",
+        show_default=True,
+    ),
+    text_width: int = typer.Option(
+        50,
+        "-w",
+        "--width",
+        help="The maximum length of lines in the caption file.",
+        show_default=True,
+    ),
+):
+    """
+    Translate speech in one language to text in another using Google's Media
+    Translation API.
+    """
+
+    typer.echo(
+        f'Translating "{source_lang}" speech to "{target_lang}" text in ./{outfile} wrapped at {text_width} chars.'
+    )
+
     while True:
-        print()
-        option = input("Press any key to translate or 'q' to quit: ")
+        option = input("Press any key to start or 'q' to quit: ")
 
         if option.lower() == "q":
             break
 
-        print("Begin speaking...")
+        print("Press Ctrl+C to quit when finished.\nBegin speaking...", file=sys.stderr)
 
-        do_translation_loop()
+        tw = TextWrapper(width=text_width)
+
+        with open(outfile, "w", buffering=1) as outfile:
+            while True:
+                _do_translation_loop(tw, source_lang, target_lang, outfile)
 
 
 if __name__ == "__main__":
-    main()
+    typer.run(main)

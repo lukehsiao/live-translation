@@ -1,13 +1,21 @@
 [tool.poetry]
 name = "live-translation"
 version = "0.1.0"
-description = ""
+description = "A simple CLI for live translated captions using Google's Media Translation API."
+license = "Apache-2.0"
+readme = "README.rst"
+repository = "https://github.com/lukehsiao/live-translation"
+homepage = "https://github.com/lukehsiao/live-translation"
 authors = ["Luke Hsiao <luke@hsiao.dev>"]
+
+[tool.poetry.scripts]
+translate = "live_translation.main:app"
 
 [tool.poetry.dependencies]
 python = "^3.8"
 google-cloud-media-translation = "^0.5.0"
 PyAudio = "^0.2.11"
+typer = "^0.3.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
