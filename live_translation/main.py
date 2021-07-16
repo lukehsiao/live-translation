@@ -1,13 +1,29 @@
+# -*- coding: utf-8 -*-
+
+# Copyright 2020 Google LLC
+# Modifications copyright 2021 Luke Hsiao
+#
+# Licensed under the Apache License, Version 2.0 (the 'License');
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an 'AS IS' BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import division
 
-import sys
-from enum import Enum
-import time
 import itertools
+import sys
+import time
 from textwrap import TextWrapper
 
-from google.cloud import mediatranslation as media
 import typer
+from google.cloud import mediatranslation as media
 
 from live_translation.microphone import MicrophoneStream
 
@@ -35,15 +51,17 @@ def _listen_print_loop(tw, output, responses):
             or response.speech_event_type == SpeechEventType.END_OF_SINGLE_UTTERANCE
         ):
 
-            for line in tw.wrap(f"{translation}"):
-                output.write(f"{line}\n")
-                time.sleep(1)
+            fill = "~^~".join(tw.wrap(f"{translation}"))
+            output.write(f"{fill}\n")
+            time.sleep(1)
             return 0
 
         result = response.result
         translation = result.text_translation_result.translation
         is_final = result.text_translation_result.is_final
 
+        fill = "~^~".join(tw.wrap(f"{translation}"))
+        output.write(f"{fill}\n")
         #  print(u"{0}".format(translation), end='\r')
 
 
@@ -112,22 +130,21 @@ def main(
     Translate speech in one language to text in another using Google's Media
     Translation API.
     """
+    with open(outfile, "w", buffering=1) as outfile:
 
-    typer.echo(
-        f'Translating "{source_lang}" speech to "{target_lang}" text in ./{outfile} wrapped at {text_width} chars.'
-    )
+        while True:
+            option = input("Press any key to start or 'q' to quit: ")
 
-    while True:
-        option = input("Press any key to start or 'q' to quit: ")
+            if option.lower() == "q":
+                break
 
-        if option.lower() == "q":
-            break
+            print(
+                "Press Ctrl+C to quit when finished.\nBegin speaking...",
+                file=sys.stderr,
+            )
 
-        print("Press Ctrl+C to quit when finished.\nBegin speaking...", file=sys.stderr)
+            tw = TextWrapper(width=text_width)
 
-        tw = TextWrapper(width=text_width)
-
-        with open(outfile, "w", buffering=1) as outfile:
             while True:
                 _do_translation_loop(tw, source_lang, target_lang, outfile)
 
