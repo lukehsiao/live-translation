@@ -18,12 +18,14 @@
 from __future__ import division
 
 import itertools
+import queue
 import sys
 import time
 from textwrap import TextWrapper
 
 import typer
 from google.cloud import mediatranslation as media
+from pynput import keyboard
 
 from live_translation.microphone import MicrophoneStream
 
@@ -33,6 +35,33 @@ CHUNK = int(RATE / 10)  # 100ms
 SpeechEventType = media.StreamingTranslateSpeechResponse.SpeechEventType
 
 app = typer.Typer()
+
+# Thread-safe, unbounded FIFO queue for passing keyboard events
+q = queue.SimpleQueue()
+
+SWAP = "s"
+
+
+def _on_press(key):
+    #  try:
+    #      print(f"key: {key.char} pressed")
+    #  except AttributeError:
+    #      print(f"special key: {key} pressed")
+    pass
+
+
+def _on_release(key):
+    # 't' is the key for toggling languages
+    try:
+        if key.char == SWAP:
+            q.put(SWAP)
+    except AttributeError:
+        pass
+
+    if key == keyboard.Key.esc:
+        q.put(key)
+        # Stop the listener
+        return False
 
 
 def _listen_print_loop(tw, output, responses):
@@ -53,7 +82,9 @@ def _listen_print_loop(tw, output, responses):
 
             fill = "~^~".join(tw.wrap(f"{translation}"))
             output.write(f"{fill}\n")
-            time.sleep(1)
+
+            # Give a brief pause at the end of an utterance
+            time.sleep(0.5)
             return 0
 
         result = response.result
@@ -129,6 +160,8 @@ def main(
     """
     Translate speech in one language to text in another using Google's Media
     Translation API.
+
+    Press 's' to swap between source and target languages during runtime.
     """
     with open(outfile, "w", buffering=1) as outfile:
 
@@ -139,14 +172,37 @@ def main(
                 break
 
             print(
-                "Press Ctrl+C to quit when finished.\nBegin speaking...",
+                "Press ESC to quit when finished.\nBegin speaking...",
                 file=sys.stderr,
             )
 
             tw = TextWrapper(width=text_width)
 
+            # start keyboard listener in separate thread
+            listener = keyboard.Listener(on_press=_on_press, on_release=_on_release)
+            listener.start()
+
+            l1 = source_lang
+            l2 = target_lang
+            print(
+                f"[INFO] Now translating from {l1} speech to {l2} text", file=sys.stderr
+            )
             while True:
-                _do_translation_loop(tw, source_lang, target_lang, outfile)
+
+                # Check to see if we should toggle languages
+                while not q.empty():
+                    key = q.get()
+                    if key == SWAP:
+                        # Swap languages
+                        l1, l2 = l2, l1
+                        print(
+                            f"[INFO] Now translating from {l1} speech to {l2} text",
+                            file=sys.stderr,
+                        )
+                    elif key == keyboard.Key.esc:
+                        return
+
+                _do_translation_loop(tw, l1, l2, outfile)
 
 
 if __name__ == "__main__":
