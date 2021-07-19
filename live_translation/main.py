@@ -30,8 +30,6 @@ from pynput import keyboard
 from live_translation.microphone import MicrophoneStream
 
 # Audio recording parameters
-RATE = 16000
-CHUNK = int(RATE / 10)  # 100ms
 SpeechEventType = media.StreamingTranslateSpeechResponse.SpeechEventType
 
 app = typer.Typer()
@@ -51,7 +49,6 @@ def _on_press(key):
 
 
 def _on_release(key):
-    # 't' is the key for toggling languages
     try:
         if key.char == SWAP:
             q.put(SWAP)
@@ -84,7 +81,7 @@ def _listen_print_loop(tw, output, responses):
             output.write(f"{fill}\n")
 
             # Give a brief pause at the end of an utterance
-            time.sleep(0.5)
+            time.sleep(0.3)
             return 0
 
         result = response.result
@@ -93,7 +90,6 @@ def _listen_print_loop(tw, output, responses):
 
         fill = "~^~".join(tw.wrap(f"{translation}"))
         output.write(f"{fill}\n")
-        #  print(u"{0}".format(translation), end='\r')
 
 
 def _do_translation_loop(tw: TextWrapper, source: str, target: str, outfile):
@@ -113,8 +109,9 @@ def _do_translation_loop(tw: TextWrapper, source: str, target: str, outfile):
     # Note that audio_content is explicitly set to None.
     first_request = media.StreamingTranslateSpeechRequest(streaming_config=config)
 
-    with MicrophoneStream(RATE, CHUNK) as stream:
+    with MicrophoneStream() as stream:
         audio_generator = stream.generator()
+
         mic_requests = (
             media.StreamingTranslateSpeechRequest(audio_content=content)
             for content in audio_generator
@@ -163,46 +160,46 @@ def main(
 
     Press 's' to swap between source and target languages during runtime.
     """
-    with open(outfile, "w", buffering=1) as outfile:
+    try:
+        with open(outfile, "w", buffering=1) as outfile:
 
-        while True:
-            option = input("Press any key to start or 'q' to quit: ")
-
-            if option.lower() == "q":
-                break
-
-            print(
-                "Press ESC to quit when finished.\nBegin speaking...",
-                file=sys.stderr,
-            )
-
-            tw = TextWrapper(width=text_width)
-
-            # start keyboard listener in separate thread
-            listener = keyboard.Listener(on_press=_on_press, on_release=_on_release)
-            listener.start()
-
-            l1 = source_lang
-            l2 = target_lang
-            print(
-                f"[INFO] Now translating from {l1} speech to {l2} text", file=sys.stderr
-            )
             while True:
+                option = input("Press any key to start or 'q' to quit: ")
 
-                # Check to see if we should toggle languages
-                while not q.empty():
-                    key = q.get()
-                    if key == SWAP:
-                        # Swap languages
-                        l1, l2 = l2, l1
-                        print(
-                            f"[INFO] Now translating from {l1} speech to {l2} text",
-                            file=sys.stderr,
-                        )
-                    elif key == keyboard.Key.esc:
-                        return
+                if option.lower() == "q":
+                    break
 
-                _do_translation_loop(tw, l1, l2, outfile)
+                tw = TextWrapper(width=text_width)
+
+                # start keyboard listener in separate thread
+                listener = keyboard.Listener(on_press=_on_press, on_release=_on_release)
+                listener.start()
+
+                l1 = source_lang
+                l2 = target_lang
+                print(
+                    f"[INFO] Now translating from {l1} speech to {l2} text",
+                    file=sys.stderr,
+                )
+
+                while True:
+
+                    # Check to see if we should toggle languages
+                    while not q.empty():
+                        key = q.get()
+                        if key == SWAP:
+                            # Swap languages
+                            l1, l2 = l2, l1
+                            print(
+                                f"[INFO] Now translating from {l1} speech to {l2} text",
+                                file=sys.stderr,
+                            )
+                        elif key == keyboard.Key.esc:
+                            return
+
+                    _do_translation_loop(tw, l1, l2, outfile)
+    except KeyboardInterrupt:
+        print("Exiting!")
 
 
 if __name__ == "__main__":
