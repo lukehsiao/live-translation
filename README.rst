@@ -14,18 +14,18 @@ Dependencies
 ^^^^^^^^^^^^
 
 1. Setup a Google Cloud account following the instructions in
-<https://cloud.google.com/translate/media/docs/streaming>.
+   https://cloud.google.com/translate/media/docs/streaming.
 
 Be sure to save your ``key.json`` securely.
 
 2. Install `poetry`_.
 
-3. Install system dependencies for pyaudio.::
-
+3. Install system dependencies for pyaudio.
+   ::
     $ sudo apt install portaudio19-dev
 
-4. Install this package.::
-
+4. Install this package.
+   ::
     $ git clone https://github.com/lukehsiao/live-translation.git
     $ cd live_translation
     $ poetry install
@@ -33,8 +33,8 @@ Be sure to save your ``key.json`` securely.
 Usage
 -----
 
-From inside a ``poetry shell``, you can access the script directly.::
-
+From inside a ``poetry shell``, you can access the script directly.
+::
     Usage: translate [OPTIONS]
 
       Translate speech in one language to text in another using Google's Media
@@ -82,8 +82,16 @@ This was hacked together for a meeting with two spoken languages. So, in order
 to be able to switch translations on the fly, you can also press `s` during
 runtime in the terminal window to swap the source and target languages.
 
+Contributing
+------------
+
+You can quickly install the developer pre-commit hooks be running:
+::
+    $ make dev
+
+From inside your poetry shell.
+
 
 .. _Media Translation API: https://cloud.google.com/media-translation
-.. _Open Broadcaster Software (OBS): https://obsproject.com/
 .. _Open Broadcaster Software (OBS): https://obsproject.com/
 .. _poetry: https://python-poetry.org/docs/#installation
