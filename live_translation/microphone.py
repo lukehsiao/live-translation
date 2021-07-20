@@ -15,8 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import queue
+import sys
 
 import sounddevice as sd
 

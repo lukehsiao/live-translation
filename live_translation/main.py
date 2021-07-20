@@ -184,7 +184,7 @@ def main(
 
                 while True:
 
-                    # Check to see if we should toggle languages
+                    # Check to see if we should toggle languages.
                     while not q.empty():
                         key = q.get()
                         if key == SWAP:
