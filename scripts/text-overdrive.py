@@ -36,8 +36,9 @@ class State:
 
         nextlines = self.captionfile.readline().split("~^~")
         if nextlines[0]:
-            # Only look at the last 4 lines, assuming the previous are stable
-            self.line = "\n".join(nextlines[-4:])
+            # Only look at the last N lines, assuming the previous are stable
+            N = 3
+            self.line = "\n".join(nextlines[-N:])
             print(self.line)
 
         return self.line

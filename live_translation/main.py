@@ -147,7 +147,7 @@ def main(
         show_default=True,
     ),
     text_width: int = typer.Option(
-        50,
+        55,
         "-w",
         "--width",
         help="The maximum length of lines in the caption file.",

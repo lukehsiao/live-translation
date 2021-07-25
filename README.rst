@@ -51,7 +51,7 @@ From inside a ``poetry shell``, you can access the script directly.
                                       captions.txt]
 
       -w, --width INTEGER             The maximum length of lines in the caption
-                                      file.  [default: 50]
+                                      file.  [default: 55]
 
       --help                          Show this message and exit.
 
@@ -81,6 +81,12 @@ higher refresh rate than the ~1 Hz that OBS currently provides.
 This was hacked together for a meeting with two spoken languages. So, in order
 to be able to switch translations on the fly, you can also press `s` during
 runtime in the terminal window to swap the source and target languages.
+
+Displaying in OBS
+^^^^^^^^^^^^^^^^^
+The captions look best with a dark background. On an HD canvas, I use a
+background of #c8000000 that is 1920x250 in size. Captions go on top of that in
+#dedede. I like Lato Semibold, size 256. I show 3 lines of text with 55 chars.
 
 Contributing
 ------------
