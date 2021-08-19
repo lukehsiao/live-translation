@@ -34,7 +34,7 @@ class State:
 
         self.counter = 0
 
-        nextlines = self.captionfile.readline().split("~^~")
+        nextlines = self.captionfile.readline().lstrip().split("~^~")
         if nextlines[0]:
             # Only look at the last N lines, assuming the previous are stable
             N = 3
