@@ -97,6 +97,12 @@ You can quickly install the developer pre-commit hooks be running:
 
 From inside your poetry shell.
 
+Roadmap
+=======
+- [ ] Stop using a text file to pass information between processes.
+- [ ] Code clean-up, e.g. enums for languages, rather than strings.
+- [ ] Incorporate into a single OBS plugin?
+
 
 .. _Media Translation API: https://cloud.google.com/media-translation
 .. _Open Broadcaster Software (OBS): https://obsproject.com/
