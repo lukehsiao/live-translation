@@ -24,7 +24,9 @@ class State:
         self.captionfile = open("/path/to/repo/captions.txt", "r")
         self.line = None
         self.counter = 0
-        self.divider = 10
+
+        # Refresh captions every self.divider / FPS seconds
+        self.divider = 2
 
     def tick(self):
         # To lessen the CPU load, only update once every self.divider frames
@@ -34,7 +36,7 @@ class State:
 
         self.counter = 0
 
-        nextlines = self.captionfile.readline().lstrip().split("~^~")
+        nextlines = self.captionfile.readline().split("~^~")
         if nextlines[0]:
             # Only look at the last N lines, assuming the previous are stable
             N = 3

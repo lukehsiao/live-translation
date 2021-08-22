@@ -40,7 +40,7 @@ From inside a ``poetry shell``, you can access the script directly.
       Translate speech in one language to text in another using Google's Media
       Translation API.
 
-      Press 's' to swap between source and target languages during runtime.
+      Press '`' to swap between source and target languages during runtime.
 
     Options:
       -f, --source-lang TEXT          The speaker's language  [default: en-US]
@@ -79,7 +79,7 @@ rather than just reading from a text file, because captions require a much
 higher refresh rate than the ~1 Hz that OBS currently provides.
 
 This was hacked together for a meeting with two spoken languages. So, in order
-to be able to switch translations on the fly, you can also press `s` during
+to be able to switch translations on the fly, you can also press ````` during
 runtime in the terminal window to swap the source and target languages.
 
 Displaying in OBS

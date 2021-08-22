@@ -20,8 +20,6 @@ from __future__ import division
 import itertools
 import queue
 import sys
-import time
-from collections import deque
 from textwrap import TextWrapper
 
 import typer
@@ -38,7 +36,7 @@ app = typer.Typer()
 # Thread-safe, unbounded FIFO queue for passing keyboard events
 q = queue.SimpleQueue()
 
-SWAP = "s"
+SWAP = "`"
 
 
 def _on_press(key):
@@ -62,7 +60,7 @@ def _on_release(key):
         return False
 
 
-def _listen_print_loop(tw, output, responses, text_buffer):
+def _listen_print_loop(tw, source_lang, output, responses):
     """Iterates through server responses and prints them.
 
     The responses passed is a generator that will block until a response
@@ -70,7 +68,6 @@ def _listen_print_loop(tw, output, responses, text_buffer):
     """
     translation = ""
     is_final = False
-    max_len = 0
     for response in responses:
         # Once the transcription settles, the response contains the
         # END_OF_SINGLE_UTTERANCE event.
@@ -78,47 +75,37 @@ def _listen_print_loop(tw, output, responses, text_buffer):
             is_final
             or response.speech_event_type == SpeechEventType.END_OF_SINGLE_UTTERANCE
         ):
-            text_buffer.extend(translation.strip() + " ")
-            fill = "~^~".join(tw.wrap(f"{''.join(text_buffer)}"))
+
+            fill = "~^~".join(tw.wrap(f"{translation}"))
             output.write(f"{fill}\n")
 
-            # Give a brief pause at the end of an utterance
-            time.sleep(0.3)
             return 0
 
         result = response.result
         translation = result.text_translation_result.translation
-        max_len = max(max_len, len(translation))
-
-        # Make room on the right for the next utterance
-        while len(text_buffer) + max_len >= text_buffer.maxlen:
-            text_buffer.popleft()
-
-        # Keep clearing until the word boundary
-        while len(text_buffer) and text_buffer[0] != " ":
-            text_buffer.popleft()
-
         is_final = result.text_translation_result.is_final
 
-        text_buffer.extend(translation.strip())
-        fill = "~^~".join(tw.wrap(f"{''.join(text_buffer)}"))
-        output.write(f"{fill}\n")
-
-        # Undo in-progress translation
-        for _ in range(len(translation)):
-            text_buffer.pop()
+        if source_lang == "en-US":
+            fill = "~^~".join(tw.wrap(f"{translation}"))
+            output.write(f"{fill}\n")
 
 
-def _do_translation_loop(
-    tw: TextWrapper, source: str, target: str, outfile, text_buffer: deque
-):
+def _do_translation_loop(tw: TextWrapper, source: str, target: str, outfile):
     client = media.SpeechTranslationServiceClient()
 
-    speech_config = media.TranslateSpeechConfig(
-        audio_encoding="linear16",
-        source_language_code=source,
-        target_language_code=target,
-    )
+    if source == "en-US":
+        speech_config = media.TranslateSpeechConfig(
+            audio_encoding="linear16",
+            source_language_code=source,
+            target_language_code=target,
+            model="google-provided-model/video",
+        )
+    else:
+        speech_config = media.TranslateSpeechConfig(
+            audio_encoding="linear16",
+            source_language_code=source,
+            target_language_code=target,
+        )
 
     config = media.StreamingTranslateSpeechConfig(
         audio_config=speech_config, single_utterance=True
@@ -141,7 +128,7 @@ def _do_translation_loop(
         responses = client.streaming_translate_speech(requests)
 
         # Print the translation responses as they arrive
-        result = _listen_print_loop(tw, outfile, responses, text_buffer)
+        result = _listen_print_loop(tw, source, outfile, responses)
         if result == 0:
             stream.exit()
 
@@ -177,7 +164,7 @@ def main(
     Translate speech in one language to text in another using Google's Media
     Translation API.
 
-    Press 's' to swap between source and target languages during runtime.
+    Press '`' to swap between source and target languages during runtime.
     """
     try:
         with open(outfile, "w", buffering=1) as outfile:
@@ -201,8 +188,8 @@ def main(
                     file=sys.stderr,
                 )
 
-                text_buffer = deque(maxlen=text_width * 3)
                 while True:
+
                     # Check to see if we should toggle languages.
                     while not q.empty():
                         key = q.get()
@@ -216,7 +203,7 @@ def main(
                         elif key == keyboard.Key.esc:
                             return
 
-                    _do_translation_loop(tw, l1, l2, outfile, text_buffer)
+                    _do_translation_loop(tw, l1, l2, outfile)
     except KeyboardInterrupt:
         print("Exiting!")
 
