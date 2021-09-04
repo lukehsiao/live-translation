@@ -82,6 +82,15 @@ This was hacked together for a meeting with two spoken languages. So, in order
 to be able to switch translations on the fly, you can also press ````` during
 runtime in the terminal window to swap the source and target languages.
 
+This script currently uses the enhanced video language model for translating
+from ``en-US``, which seems to work reasonably well when displayed in realtime
+as results are returned. However, the same cannot be said of ``es-MX`` to
+``en-US``. The quality of this translation is far worse. In order to have a
+reasonable experience, we only print the final translation as a chunk. So,
+compared to the reverse translation, it will appear to have much longer latency
+between the speaker talking and the captions appearing, but this way the
+captions at least convey the gist of the message.
+
 Displaying in OBS
 ^^^^^^^^^^^^^^^^^
 The captions look best with a dark background. On an HD canvas, I use a
@@ -98,10 +107,11 @@ You can quickly install the developer pre-commit hooks be running:
 From inside your poetry shell.
 
 Roadmap
-=======
-- [ ] Stop using a text file to pass information between processes.
+-------
 - [ ] Code clean-up, e.g. enums for languages, rather than strings.
-- [ ] Incorporate into a single OBS plugin?
+- [ ] Additional word filtering or blacklisting.
+- [ ] Stop using a text file to pass information between processes. Perhaps
+  just build this into a single stand-alone OBS plugin?
 
 
 .. _Media Translation API: https://cloud.google.com/media-translation
