@@ -8,6 +8,9 @@ repository = "https://github.com/lukehsiao/live-translation"
 homepage = "https://github.com/lukehsiao/live-translation"
 authors = ["Luke Hsiao <luke@hsiao.dev>"]
 
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/lukehsiao/live-translation/issues"
+
 [tool.poetry.scripts]
 translate = "live_translation.main:app"
 
